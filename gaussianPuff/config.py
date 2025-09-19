@@ -18,10 +18,22 @@ class OutputType(Enum):
     SURFACE_TIME = 3
     NO_PLOT = 4
 
+    def from_string(output_type: str):
+        try:
+            return OutputType[output_type]
+        except KeyError:
+            raise ValueError(f"No OutpuType member matches '{output_type}'")
+
 class WindType(Enum):
     CONSTANT = 1
     FLUCTUATING = 2
     PREVAILING = 3
+
+    def from_string(wind_type: str):
+        try:
+            return WindType[wind_type]
+        except KeyError:
+            raise ValueError(f"No WindType member matches '{wind_type}'")
 
 class PasquillGiffordStability(Enum):
     VERY_UNSTABLE = 1
@@ -31,9 +43,21 @@ class PasquillGiffordStability(Enum):
     MODERATELY_STABLE= 5
     VERY_STABLE = 6
 
+    def from_string(psg_stab: str):
+        try:
+            return PasquillGiffordStability[psg_stab]
+        except KeyError:
+            raise ValueError(f"No Pasquill-Gifford member matches '{psg_stab}'")
+
 class StabilityType(Enum):
     CONSTANT = 1
     ANNUAL = 2
+
+    def from_string(stab_type: str):
+        try:
+            return StabilityType[stab_type]
+        except KeyError:
+            raise ValueError(f"No StabilityType member matches '{stab_type}'")
 
 class NPS(Enum):
     CANNABINOID_ANALOGUES = 0
@@ -85,7 +109,6 @@ class ModelConfig:
     def to_dict(self):
         d = asdict(self)
 
-        # Converto gli enum in stringhe
         d["aerosol_type"] = self.aerosol_type.name if self.aerosol_type else None
         d["stability_profile"] = self.stability_profile.name if self.stability_profile else None
         d["stability_value"] = self.stability_value.name if self.stability_value else None
@@ -93,7 +116,6 @@ class ModelConfig:
         d["output"] = self.output.name if self.output else None
         d["dispersion_model"] = self.dispersion_model.name if self.dispersion_model else None
 
-        # Se hai un ConfigPuff con attributi complessi, serializzalo
         if self.config_puff:
             d["config_puff"] = (
                 self.config_puff.to_dict() if hasattr(self.config_puff, "to_dict") else asdict(self.config_puff)

@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   gaussian_puff:
-    image: gaussian_disperion_model:latest
+    image: gaussian_dispersion_model:latest
     container_name: gaussian_dispersion_model
     ports:
       - "8002:8002"
@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   pention_system:
-    image: pention_system:latest
+    image: pention-frontend:latest
     container_name: pention_system
     ports:
       - "8004:8004"

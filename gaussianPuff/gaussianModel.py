@@ -31,7 +31,7 @@ def apply_hygroscopic_growth(C1: np.ndarray, RH: float, dry_size: float, nps_typ
     # Humidified mass and moles
     nw=RH*nu*moles/(1.-RH)
     mass2=nw*Mw+moles*Ms
-    C1_humidified=C1*mass2/mass; 
+    C1_humidified=C1*mass2/mass
 
     return C1_humidified
 

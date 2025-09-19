@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 import os, sys
+
 from pydantic import BaseModel, Field
 from typing import List, Tuple, Optional
 import logging
@@ -7,7 +8,7 @@ import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from gaussianPuff.gaussianModel import run_dispersion_model
-from gaussianPuff.config import ModelConfig
+from gaussianPuff.config import ModelConfig, WindType, StabilityType, PasquillGiffordStability, NPS, OutputType
 import uvicorn
 
 # Configurazione logger
@@ -36,7 +37,7 @@ class ModelConfigRequest(BaseModel):
     config_puff: Optional[dict] = None
 
 class Payload(BaseModel):
-    model_config: ModelConfigRequest
+    config: ModelConfigRequest
     bounds: List[float] = Field(..., min_items=4, max_items=4)
 
 app = FastAPI()
@@ -45,7 +46,33 @@ app = FastAPI()
 def start_simulation(payload: dict):
     logger.info("Ricevuta richiesta /start_simulation")
     try:
-        config = ModelConfig(**payload.get("model_config", {}))
+        raw_config = payload.get("config", {})
+        logger.info(raw_config)
+
+        wind_type= WindType.from_string(raw_config["wind_type"])
+        stability_type = StabilityType.from_string(raw_config["stability_profile"])
+        output_type= OutputType.from_string(raw_config["output"])
+        stability_value=PasquillGiffordStability.from_string(raw_config["stability_value"])
+        nps_type= NPS.from_string(raw_config["aerosol_type"])
+
+        config = ModelConfig(
+            days=raw_config["days"],
+            RH=raw_config["RH"],
+            aerosol_type=nps_type,
+            humidify=raw_config["humidify"],
+            stability_profile=stability_type,
+            stability_value=stability_value,
+            wind_type=wind_type,
+            wind_speed=raw_config["wind_speed"],
+            output=output_type,
+            stacks=raw_config["stacks"],
+            dry_size=raw_config["dry_size"],
+            x_slice=raw_config["x_slice"],
+            y_slice=raw_config["y_slice"],
+            dispersion_model=raw_config["config_puff"],
+            config_puff=raw_config["config_puff"]
+        )
+
         bounds = payload.get("bounds", None)
         logger.info(f"Configurazione modello creata: {config}")
         logger.info(f"Bounds ricevuti: {bounds}")
@@ -54,21 +81,31 @@ def start_simulation(payload: dict):
         logger.info("Simulazione completata")
 
         C1, (x, y, z), times, stability, wind_dir, stab_label, wind_label, puff = result
+        logger.info("End gaussian model simulation")
 
-        response = {
-            "status": "success",
-            "concentration": C1.tolist() if isinstance(C1, np.ndarray) else C1,
-            "x": x.tolist() if isinstance(x, np.ndarray) else x,
-            "y": y.tolist() if isinstance(y, np.ndarray) else y,
-            "z": z.tolist() if isinstance(z, np.ndarray) else z,
-            "times": times.tolist() if isinstance(times, np.ndarray) else times,
-            "stability": stability.tolist() if isinstance(stability, np.ndarray) else stability,
-            "wind_dir": wind_dir,
-            "stab_label": stab_label,
-            "wind_label": wind_label,
-            "puff": puff if puff is not None else None
-        }
+        try:
+            response = {
+                "status": 200,
+                "concentration": C1.tolist() if isinstance(C1, np.ndarray) else C1,
+                "x": x.tolist() if isinstance(x, np.ndarray) else x,
+                "y": y.tolist() if isinstance(y, np.ndarray) else y,
+                "z": z.tolist() if isinstance(z, np.ndarray) else z,
+                "times": times.tolist() if isinstance(times, np.ndarray) else times,
+                "stability": stability.tolist() if isinstance(stability, np.ndarray) else str(stability),
+                "wind_dir": str(wind_dir),
+                "stab_label": str(stab_label),
+                "wind_label": str(wind_label),
+                "puff": puff.tolist() if isinstance(puff, np.ndarray) else (str(puff) if puff is not None else None)
+            }
 
+            for k, v in response.items():
+                logger.info(f"{k}: {type(v)}")
+
+        except Exception as e:
+            logger.exception("Errore nella conversione dei dati")
+            raise e
+
+        logger.info(f"Simulazione completata: ritorno")
         return response
 
     except Exception as error:
