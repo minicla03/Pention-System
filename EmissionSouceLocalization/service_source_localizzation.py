@@ -112,15 +112,10 @@ def predict_source(sensors: list, n_sensor_operating: int):
         })
         agg_features_list.append(feat)
 
-    X_input = pd.DataFrame(agg_features_list)
+    X_input = pd.DataFrame(agg_features_list).fillna(0)
 
-    X_input = X_input.fillna(0)
-
-    for col in ["simulation_id", "source_x", "source_y"]:
-        if col not in X_input.columns:
-            X_input[col] = 0
-
-    cols_scaler = scaler.feature_names_in_ if hasattr(scaler, "feature_names_in_") else X_input.columns
+    cols_scaler = scaler.feature_names_in_
+    logger.info(cols_scaler)
     X_input = X_input.reindex(columns=cols_scaler, fill_value=0)
 
     X_scaled = scaler.transform(X_input)
@@ -128,8 +123,15 @@ def predict_source(sensors: list, n_sensor_operating: int):
 
     logger.info(f"Input features shape after scaling: {X_scaled_df.shape}")
 
-    y_pred = model.predict(X_scaled_df)
-    result = [{"source_x": float(x), "source_y": float(y)} for x, y in y_pred]
+    for col in ["simulation_id", "source_x", "source_y"]:
+        if col not in X_scaled_df.columns:
+            X_scaled_df[col] = 0
 
-    logger.info(f"Prediction completed: {result}")
-    return {"predicted_location": result}
+    X_scaled_df = X_scaled_df[model.feature_names_in_]
+
+    y_pred = model.predict(X_scaled_df)
+
+    x, y = y_pred[0]
+
+    logger.info(f"Prediction completed: {x},{y}")
+    return x, y

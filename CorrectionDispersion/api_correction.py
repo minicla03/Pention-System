@@ -56,20 +56,16 @@ def generate_map(bbox: BBox):
     }
 
 @app.post("/correct_dispersion")
-def predict_endpoint(
-        wind_speed: float,
-        wind_dir: float,
-        concentration_map: List[List[float]],
-        building_map: List[List[float]],
-        global_features: Optional[List[float]] = None
-):
-    conc_map = np.array(concentration_map, dtype=np.float32)
-    build_map = np.array(building_map, dtype=np.float32)
-    glob_feat = np.array(global_features, dtype=np.float32) if global_features else None
+def predict_endpoint(payload: DispersionInput):
 
-    correction_map = correct_dispersion(wind_dir, wind_speed, conc_map, build_map, glob_feat)
+    conc_map = np.array(payload.concentration_map, dtype=np.float32)
+    build_map = np.array(payload.building_map, dtype=np.float32)
+    glob_feat = np.array(payload.global_features, dtype=np.float32) if payload.global_features else None
 
-    return {"status_code": "success", "predictions": correction_map.tolist()}
+    correction_map = correct_dispersion(payload.wind_dir, payload.wind_speed, conc_map, build_map, glob_feat)
+
+    return {"status_code": "success",
+            "predictions": correction_map.tolist()}
 
 """
 if __name__ == "__main__":

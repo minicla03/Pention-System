@@ -36,10 +36,14 @@ def predict_source_raw(request: PredictRequest):
     logger.info(f"Ricevuta richiesta /predict_source_raw con {len(request.payload_sensors)} record")
 
     try:
-        result = predict_source(request.payload_sensors, request.n_sensor_operating)
+        x, y = predict_source(request.payload_sensors, request.n_sensor_operating)
         logger.info("Predizione sorgente completata")
 
-        return result.get("predicted_location", (None, None))
+        return  {
+                "status": 200,
+                "x": x,
+                "y": y,
+        }
 
     except Exception as e:
         logger.exception("Errore durante la predizione della sorgente")

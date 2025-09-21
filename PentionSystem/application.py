@@ -45,7 +45,7 @@ def run_application(payload):
             f"**Griglia**: {metadata.get('grid_size', 'N/A')}×{metadata.get('grid_size', 'N/A')}\n"
             f"**Edifici totali**: {metadata.get('total_buildings', 'N/A')}\n"
             f"**Celle edifici**: {int(np.sum(building_cells)) if isinstance(building_cells, np.ndarray) else building_cells:,}\n"
-            f"**Celle libere*: {int(np.sum(free_cells)) if isinstance(free_cells, np.ndarray) else free_cells:,}\n"
+            f"**Celle libere**: {int(np.sum(free_cells)) if isinstance(free_cells, np.ndarray) else free_cells:,}\n"
             f"**CRS**: {metadata.get('crs', 'N/A')}\n"
             f"**Risoluzione**: {metadata.get('resolution (m)', 'N/A')} m\n"
             f"**Densità edifici**: {float(metadata.get('building_density', np.nan)):.1f}%\n"
@@ -229,23 +229,24 @@ def run_application(payload):
                     "wind_type": wind_type.value if not s.is_fault else None,
                 })
 
-    print(payload_sensors)
     n_sensor_operating = ([s for s in sensors_substance if not s.is_fault]).__len__()
 
     status_text.text("Start the prediction of the source...")
-    response = requests.post(f"{API_URL}8003/predict_source_raw", json={
+    response_loc = requests.post(f"{API_URL}8003/predict_source_raw", json={
         "payload_sensors": payload_sensors,
         "n_sensor_operating": n_sensor_operating
     })
 
-    data = response.json()
-    pred = data["predicted_location"][0]
-    origin_lat = pred["source_x"]
-    origin_lon = pred["source_y"]
+    if response_loc.status_code != 200:
+        st.error("Error in prediction of source.")
+
+    data = response_loc.json()
+    x = data["x"]
+    y = data["y"]
 
     if source_section is not None:
-        if origin_lat is not None and origin_lon is not None:
-            source_placeholder.markdown(f"Lat: {origin_lat}, Long: {origin_lon}")
+        if x is not None and y is not None:
+            source_placeholder.markdown(f"Lat: {x}, Long: {y}")
         else:
             source_placeholder.warning("Source not estimated.")
 
@@ -253,7 +254,9 @@ def run_application(payload):
     progress_bar.progress(progress)
 
     # --- gaussian plume dispersion (raw simulation) 
-    status_text.text("Raw dispersion simulation...") 
+    status_text.text("Raw dispersion simulation...")
+
+    stacks = [(x, y, Q, h_src)]
 
     param_gaussian_model = ModelConfig(
         days=10,
@@ -286,14 +289,14 @@ def run_application(payload):
     wind_dir_raw = gauss_data.get("wind_dir")
     C1_raw = gauss_data.get("concentration", [])
 
-    x = np.array(x_raw)
-    y = np.array(y_raw)
+    x_grid = np.array(x_raw)
+    y_grid = np.array(y_raw)
     times = np.array(times_raw)
     wind_dir = np.array(wind_dir_raw)
     C1 = np.array(C1_raw)
 
     status_text.text("Dispersion map generation...")
-    plot_plan_view(C1, x, y, dispersion_placeholder)
+    plot_plan_view(C1, x_grid, y_grid, dispersion_placeholder)
     status_text.text("Wind rose graph generation...")
     plot_wind_rose(wind_dir, wind_speed, wind_rose_placeholder)
 
@@ -308,12 +311,12 @@ def run_application(payload):
                                       "wind_dir": wind_dir.tolist(),
                                       "concentration_map": C1.tolist(),
                                       "building_map": binary_map.tolist(),
-                                      "global_features": list(metadata.values())
+                                      "global_features": None
                                   })
 
     if response_mcxm.status_code != 200: 
         st.error("Errore nella correzione della dispersione.") 
-        return sensors_substance, substance_nps, origin_lat, origin_lon, C1, metadata
+        return sensors_substance, substance_nps, x, y, C1, metadata
     
     real_dispersion_map = response_mcxm.json().get("predictions", [])
     
