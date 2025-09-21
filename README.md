@@ -58,7 +58,7 @@ Avviare l’applicazione principale:
 ```bash
 git clone https://github.com/minicla03/Pention-System.git
 cd Pention-System/PentionSystem
-streamlit run application.py
+streamlit run controllers.py
 ```
 ---
 

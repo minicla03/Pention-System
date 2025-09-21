@@ -1,17 +1,10 @@
-import streamlit as st
-import numpy as np
-import folium
-from streamlit_folium import st_folium
-import requests
-import matplotlib.pyplot as plt
-import sys
 import os
-import folium
-from windrose import WindroseAxes
-from folium.plugins import HeatMap
+import sys
 from collections import Counter
+import requests
+from plot_functions import *
+from utils import *
 
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
@@ -20,166 +13,6 @@ from gaussianPuff.Sensor import SensorSubstance, SensorAir
 from gaussianPuff.config import NPS, OutputType, DispersionModelType, ModelConfig
 
 API_URL = "http://127.0.0.1:"
-
-nps_classes = [
-    'Cathinone analogues',
-    'Cannabinoid analogues',
-    'Phenethylamine analogues',
-    'Piperazine analogues',
-    'Tryptamine analogues',
-    'Fentanyl analogues'
-]
-
-def random_position(free_cells):
-    idx = np.random.choice(len(free_cells))
-    y, x = free_cells[idx]
-    return float(y), float(x)
-
-def plot_dispersion_on_map(min_lat, min_lon, max_lat, max_lon, sensors, dispersion_map, source_lat=None, source_lon=None, 
-                           title="Mappa Dispersione", wind_dir=None, wind_speed=None, puff_list=None, stability_class=1, n_show=10):
-    center_lat = (min_lat + max_lat) / 2
-    center_lon = (min_lon + max_lon) / 2
-
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="cartodbpositron")
-
-    # Sensori
-    for s in sensors:
-        folium.Marker(
-            [s.y, s.x],
-            popup=f"Sensor {s.id}",
-            icon=folium.Icon(color="blue", icon="info-sign")
-        ).add_to(m)
-
-    # Sorgente stimata
-    if source_lat is not None and source_lon is not None:
-        folium.Marker(
-            [source_lat, source_lon],
-            popup="Sorgente Stimata",
-            icon=folium.Icon(color="red", icon="fire")
-        ).add_to(m)
-
-    # Heatmap della dispersione
-    heat_data = []
-    rows = len(dispersion_map)
-    cols = len(dispersion_map[0]) if rows > 0 else 0
-
-    for i in range(rows):
-        for j in range(cols):
-            lat = min_lat + (max_lat - min_lat) * (i / max(rows-1, 1))
-            lon = min_lon + (max_lon - min_lon) * (j / max(cols-1, 1))
-            conc = dispersion_map[i][j]
-            if conc > 0:  # evita punti nulli
-                heat_data.append([lat, lon, conc])
-
-    if heat_data:
-        HeatMap(
-            heat_data,
-            radius=25,
-            blur=15,
-            max_val=max([c[2] for c in heat_data]),
-            min_opacity=0.2
-        ).add_to(m)
-
-    title_html = f'''
-         <h3 align="center" style="font-size:18px"><b>{title}</b></h3>
-         '''
-    m.get_root().html.add_child(folium.Element(title_html))
-
-    return m
-
-def plot_plan_view(C1, x, y, title="Plan View", puff_list=None, stability_class=1):
-    with dispersion_placeholder:
-
-        fig, ax_main = plt.subplots(figsize=(8, 6))
-
-        # Integra la concentrazione nel tempo lungo l'asse 2 (T)
-        data = np.trapezoid(C1, axis=2) * 1e6  # µg/m³ #type:ignore
-        vmin = np.percentile(data, 5)
-        vmax = np.percentile(data, 95)
-
-        # Plot della concentrazione integrata
-        pcm = ax_main.pcolor(x, y, data, cmap='jet', shading='auto', vmin=vmin, vmax=vmax)
-        fig.colorbar(pcm, ax=ax_main, label=r'$\mu g \cdot m^{-3}$')
-        ax_main.set_xlabel('x (m)')
-        ax_main.set_ylabel('y (m)')
-        ax_main.set_title(title)
-        ax_main.axis('equal')
-
-        st.pyplot(fig, clear_figure=True)
-
-def plot_wind_rose(wind_dir, wind_speed):
-
-    with wind_rose_placeholder:
-        if wind_dir is not None and wind_speed is not None:
-
-            fig = plt.figure(figsize=(6, 6))
-
-            #inset_pos = [0.65, 0.65, 0.3, 0.3]  # left, bottom, width, height in figure coords
-            ax_inset = WindroseAxes(fig)
-            fig.add_axes(ax_inset)
-
-            # Plot rosa dei venti con direzioni e velocità
-            wind_dir = np.array(wind_dir) % 360
-            wind_speed = np.full_like(wind_dir, fill_value=wind_speed, dtype=float)
-            ax_inset.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-            ax_inset.set_legend(loc='lower right', title='Wind speed (m/s)')
-            ax_inset.set_title("Rosa dei venti")
-
-            st.pyplot(fig, clear_figure=True)
-
-def plot_binary_map(binary_map, metadata, sensors=None):
-    with map_section:
-
-        fig, ax = plt.subplots(figsize=(8, 8))
-    
-        x_min, y_min, x_max, y_max = metadata['bounds']
-        im = ax.imshow(binary_map, cmap='gray', extent=(x_min, x_max, y_min, y_max), origin='lower')
-
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
-
-        building_cells = np.sum(binary_map == 0)
-        free_cells = np.sum(binary_map == 1)
-        
-        info_text = f"""
-        Griglia: {metadata.get('grid_size', 'N/A')}×{metadata.get('grid_size', 'N/A')}
-        Edifici totali: {metadata.get('total_buildings', 'N/A')}
-        Celle edifici: {building_cells:,}
-        Celle libere: {free_cells:,}
-        CRS: {metadata.get('crs', 'N/A')}
-        Risoluzione: {metadata.get('resolution (m)', 'N/A')} m
-        Densità edifici: {metadata.get('building_density', 'N/A'):.1f}%
-        Altezza media edifici: {metadata.get('mean_height', 'N/A')} m
-        Coordinate origine: {metadata.get('origin', 'N/A')}
-        Città: {metadata.get('city', 'N/A')}
-        """
-        
-        ax.text(0.02, -0.08, info_text, fontsize=10, transform=ax.transAxes,
-                verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.5))
-        
-        ax.set_xlabel("Coordinate X (grid)")
-        ax.set_ylabel("Coordinate Y (grid)")
-        ax.grid(False)
-
-        if sensors is not None:
-            for s in sensors:
-                x = s.x
-                y = s.y
-                faulty = s.is_fault
-
-                if not faulty:
-                    ax.scatter(x, y, c="green", marker="o", edgecolors="black", s=80, label="Operating")
-                else:
-                    ax.scatter(x, y, c="red", marker="X", edgecolors="black", s=100, label="Faulty")
-
-            handles, labels = ax.get_legend_handles_labels()
-            by_label = dict(zip(labels, handles))
-            ax.legend(by_label.values(), by_label.keys(), loc="upper right")
-
-        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-        cbar.set_label("Occupazione")
-        
-        st.pyplot(fig, clear_figure=True)
 
 def run_application(payload):
     
@@ -205,6 +38,20 @@ def run_application(payload):
     binary_map = np.array(data.get("map"), dtype=np.float32)
     metadata = data.get("metadata", {})
     free_cells = np.argwhere(binary_map == 1)
+    building_cells = np.sum(binary_map == 0)
+
+    with metadata_section:
+        metadata_placeholder.markdown(
+            f"**Griglia**: {metadata.get('grid_size', 'N/A')}×{metadata.get('grid_size', 'N/A')}\n"
+            f"**Edifici totali**: {metadata.get('total_buildings', 'N/A')}\n"
+            f"**Celle edifici**: {int(np.sum(building_cells)) if isinstance(building_cells, np.ndarray) else building_cells:,}\n"
+            f"**Celle libere*: {int(np.sum(free_cells)) if isinstance(free_cells, np.ndarray) else free_cells:,}\n"
+            f"**CRS**: {metadata.get('crs', 'N/A')}\n"
+            f"**Risoluzione**: {metadata.get('resolution (m)', 'N/A')} m\n"
+            f"**Densità edifici**: {float(metadata.get('building_density', np.nan)):.1f}%\n"
+            f"**Altezza media edifici**: {float(metadata.get('mean_height', np.nan))} m\n"
+            f"**Città**: {metadata.get('city', 'N/A')}"
+        )
 
     progress += 20
     progress_bar.progress(progress)
@@ -217,8 +64,8 @@ def run_application(payload):
     if weather_section is not None:
         weather_placeholder.markdown(
             f"💨 **Wind speed (m/s):** {wind_speed}  \n"
-            f"💨 **Wind type:** {wind_type.value}  \n"
-            f"📈 **Stability:** {stability_type.value}  \n"
+            f"💨 **Wind type:** {wind_type}  \n"
+            f"📈 **Stability:** {stability_type}  \n"
             f"♒︎ **Relative Humidity (%):** {RH}"
         ) 
 
@@ -232,7 +79,7 @@ def run_application(payload):
                                            noise_level=round(np.random.uniform(0.0, 0.0005), 4))
         sensors_substance.append(sensor_substance)
 
-    plot_binary_map(binary_map, metadata, sensors_substance)
+    plot_binary_map(binary_map, metadata['bounds'], map_section, sensors_substance)
 
     mass_spectrum = []
     for sensor in sensors_substance:
@@ -244,7 +91,7 @@ def run_application(payload):
     print(f"2->{type(mass_spectrum[0])}") # numpy.ndarray
        
     if sensors_section is not None:
-        sensor_info = [{"ID": s.id, "x": s.x, "y": s.y, "Status": "Operating" if not s.is_fault else "Faulty",} 
+        sensor_info = [{"ID": s.id, "x": s.x, "y": s.y, "Status": "Operating" if not s.is_fault else "Faulty",}
                        for s in sensors_substance]
         sensors_placeholder.table(sensor_info)
 
@@ -349,9 +196,9 @@ def run_application(payload):
     print(y.shape)
 
     status_text.text("Dispersion map generation...")
-    plot_plan_view(C1, x, y)
+    plot_plan_view(C1, x, y, dispersion_placeholder)
     status_text.text("Wind rose graph generation...")
-    plot_wind_rose(wind_dir, wind_speed) #okk
+    plot_wind_rose(wind_dir, wind_speed, wind_rose_placeholder)
 
     #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -360,37 +207,41 @@ def run_application(payload):
 
     payload_sensors = []
     for s in sensors_substance:
-        if not s.is_fault:
-            s.sample_substance(C1, x, y, times)
-            # s.sample_substance_synthetic()  # se serve
 
-            sensor_data = {
-                "sensor_id": s.id,
-                "time": [],
-                "conc": [],
-                "wind_dir_x": [],
-                "wind_dir_y": [],
-                "wind_speed": [],
-                "wind_type": wind_type.value
-            }
+        if not s.is_fault:
+
+            s.sample_substance(C1, x, y, times)
+            # s.sample_substance_synthetic()
 
             for idx, (t_idx, conc) in enumerate(zip(s.times, s.noisy_concentrations)):
                 if idx >= len(wind_dir):
                     break
                 wd = wind_dir[idx]
 
-                sensor_data["time"].append(t_idx)
-                sensor_data["conc"].append(float(conc) if not s.is_fault else float("nan"))
-                sensor_data["wind_dir_x"].append(float(np.cos(np.deg2rad(wd))) if not s.is_fault else float("nan"))
-                sensor_data["wind_dir_y"].append(float(np.sin(np.deg2rad(wd))) if not s.is_fault else float("nan"))
-                sensor_data["wind_speed"].append(float(wind_speed) if not s.is_fault else float("nan"))
+                payload_sensors.append({
+                    "sensor_id": s.id,
+                    "sensor_is_fault": s.is_fault,
+                    "time": t_idx,
+                    "conc": conc if not s.is_fault else None,
+                    "wind_dir_x": np.cos(np.deg2rad(wd)) if not s.is_fault else None,
+                    "wind_dir_y": np.sin(np.deg2rad(wd)) if not s.is_fault else None,
+                    "wind_speed": wind_speed if not s.is_fault else None,
+                    "wind_type": wind_type.value if not s.is_fault else None,
+                })
 
-            payload_sensors.append(sensor_data)
+    print(payload_sensors)
+    n_sensor_operating = ([s for s in sensors_substance if not s.is_fault]).__len__()
 
     status_text.text("Start the prediction of the source...")
-    response = requests.post(f"{API_URL}8003/predict_source_raw", json=payload_sensors)
-    origin_lat = response.json().get("source_x", None)
-    origin_lon = response.json().get("source_y", None)
+    response = requests.post(f"{API_URL}8003/predict_source_raw", json={
+        "payload_sensors": payload_sensors,
+        "n_sensor_operating": n_sensor_operating
+    })
+
+    data = response.json()
+    pred = data["predicted_location"][0]
+    origin_lat = pred["source_x"]
+    origin_lon = pred["source_y"]
 
     if source_section is not None:
         if origin_lat is not None and origin_lon is not None:
@@ -427,33 +278,42 @@ def run_application(payload):
     if response_gauss.status_code != 200:
         st.error("Error in Gaussian puff simulation.")
         return sensors_substance, substance_nps, None, None, None, metadata
-        
+
     gauss_data = response_gauss.json()
-    x = gauss_data.get("x", [])
-    y = gauss_data.get("y", [])
-    wind_dir = gauss_data.get("wind_dir")
-    wind_speed = gauss_data.get("wind_speed")
-    dispersion_map = gauss_data.get("predictions", [])
+    x_raw = gauss_data.get("x", [])
+    y_raw = gauss_data.get("y", [])
+    times_raw = gauss_data.get("times", [])
+    wind_dir_raw = gauss_data.get("wind_dir")
+    C1_raw = gauss_data.get("concentration", [])
+
+    x = np.array(x_raw)
+    y = np.array(y_raw)
+    times = np.array(times_raw)
+    wind_dir = np.array(wind_dir_raw)
+    C1 = np.array(C1_raw)
 
     status_text.text("Dispersion map generation...")
-    plot_plan_view(dispersion_map, x, y, title="Raw Dispersion Map",
-                   stability_class=stability_value.value)
+    plot_plan_view(C1, x, y, dispersion_placeholder)
+    status_text.text("Wind rose graph generation...")
+    plot_wind_rose(wind_dir, wind_speed, wind_rose_placeholder)
 
     progress += 20
     progress_bar.progress(progress)
 
     # --- Dispersion simulation + correction
     status_text.text("Dispersion simulation...")
-    response_mcxm = requests.post(f"{API_URL}8001/correct_dispersion", 
-                                  json={ "wind_speed": wind_speed, 
-                                        "wind_dir": wind_dir.tolist(),
-                                        "concentration_map": dispersion_map.tolist(),
-                                        "building_map": binary_map.tolist(), 
-                                        "global_features": list(metadata.values()) }) 
-    
+    response_mcxm = requests.post(f"{API_URL}8001/correct_dispersion",
+                                  json={
+                                      "wind_speed": wind_speed,
+                                      "wind_dir": wind_dir.tolist(),
+                                      "concentration_map": C1.tolist(),
+                                      "building_map": binary_map.tolist(),
+                                      "global_features": list(metadata.values())
+                                  })
+
     if response_mcxm.status_code != 200: 
         st.error("Errore nella correzione della dispersione.") 
-        return sensors_substance, substance_nps, origin_lat, origin_lon, dispersion_map, metadata 
+        return sensors_substance, substance_nps, origin_lat, origin_lon, C1, metadata
     
     real_dispersion_map = response_mcxm.json().get("predictions", [])
     
@@ -463,7 +323,7 @@ def run_application(payload):
     if map_section is not None:
         plot_dispersion_on_map(payload["min_lat"], payload["min_lon"], 
                                        payload["max_lat"], payload["max_lon"], 
-                                       sensors_substance, dispersion_map, origin_lat, origin_lon)
+                                       sensors_substance, C1, origin_lat, origin_lon)
         map_section.subheader("🗺️ Dispersion map")
 
     progress = 100
@@ -560,6 +420,7 @@ col_left, col_center, col_right = st.columns([1, 3, 1])
 with col_left:
     weather_section = st.container()
     dispersion_section = st.container()
+    metadata_section = st.container()
 
 with col_center:
     map_section = st.container()
@@ -570,7 +431,7 @@ with col_right:
     wind_rose_section = st.container()
 
 with weather_section:
-    st.markdown("**⛅Meteo conditions:**")
+    st.markdown("**⛅Meteo conditions**")
     weather_placeholder = st.empty()
     weather_placeholder.markdown(
         f"💨 **Wind speed (m/s):** N/A  \n"
@@ -580,23 +441,27 @@ with weather_section:
     )
 
 with dispersion_section:
-    st.markdown("**🗺️ Dispersion map:**")
+    st.markdown("**🗺️ Dispersion map**")
     dispersion_placeholder = st.empty()
 
 sensors_section = st.container()
 
+with metadata_section:
+    st.markdown("**🏙️ Info city map**")
+    metadata_placeholder = st.empty()
+
 with sensors_section:
-    st.markdown("**🛰️ Sensor:**")
+    st.markdown("**🛰️ Sensor**")
     sensors_placeholder = st.empty()
     sensors_placeholder.write("No data available.")
 
 with nps_section:
-    st.markdown("**🧪 Nps predicted by sensor:**")
+    st.markdown("**🧪 Nps predicted by sensor**")
     nps_placeholder = st.empty()
     nps_placeholder.write("N/A")
 
 with source_section:
-    st.markdown("**📍 Source estimated:**")
+    st.markdown("**📍 Source estimated**")
     source_placeholder = st.empty()
     source_placeholder.write("N/A")
 

@@ -7,7 +7,7 @@ import logging
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from EmissionSouceLocalization import service_source_localizzation
+from service_source_localizzation import predict_source
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,25 +15,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-"""class SensorTimeSeries(BaseModel):
-    simulation_id: str
-    sensor_id: str
-    time: List[float]
-    conc: List[float]
-    wind_dir_x: float
-    wind_dir_y: float
-    wind_speed: float
-    wind_type: str"""
+class SensorData(BaseModel):
+    sensor_id: int
+    sensor_is_fault: bool
+    time: float | None
+    conc: float | None
+    wind_dir_x: float | None
+    wind_dir_y: float | None
+    wind_speed: float | None
+    wind_type: int | None
+
+class PredictRequest(BaseModel):
+    payload_sensors: List[SensorData]
+    n_sensor_operating: int
 
 app = FastAPI()
 
 @app.post("/predict_source_raw")
-def predict_source_raw(sensors):
-
-    logger.info(f"Ricevuta richiesta /predict_source_raw con {len(sensors)} sensori")
+def predict_source_raw(request: PredictRequest):
+    logger.info(f"Ricevuta richiesta /predict_source_raw con {len(request.payload_sensors)} record")
 
     try:
-        result = service_source_localizzation.predict_source(sensors)
+        result = predict_source(request.payload_sensors, request.n_sensor_operating)
         logger.info("Predizione sorgente completata")
 
         return result.get("predicted_location", (None, None))

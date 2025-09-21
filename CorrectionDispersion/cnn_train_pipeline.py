@@ -209,7 +209,7 @@ if __name__ == "__main__":
 
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    batch_size = 16
+    batch_size = 10
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True) # type: ignore
     val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False) # type: ignore
         
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     plot_training_curves(train_losses, val_losses, val_maes, smooth_window=3)
 
     # Plot output for a sample
-    sample_map = output[11].detach().cpu().numpy()  # shape: (m, m)  # type:ignore
+    sample_map = output[5].detach().cpu().numpy()  # shape: (m, m)  # type:ignore
     plot_plan_view(sample_map, np.arange(m), np.arange(m), "Sample Output Map")
 
     # Save the model

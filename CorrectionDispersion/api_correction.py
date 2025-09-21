@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import numpy as np
+from typing import List, Optional
 import json
 import os
 import sys
@@ -55,14 +56,19 @@ def generate_map(bbox: BBox):
     }
 
 @app.post("/correct_dispersion")
-def predict_endpoint(wind_speed: float, wind_dir: float, concentration_map: list, building_map: list, global_features: list):
-    
+def predict_endpoint(
+        wind_speed: float,
+        wind_dir: float,
+        concentration_map: List[List[float]],
+        building_map: List[List[float]],
+        global_features: Optional[List[float]] = None
+):
     conc_map = np.array(concentration_map, dtype=np.float32)
     build_map = np.array(building_map, dtype=np.float32)
-    glob_feat = np.array(global_features, dtype=np.float32) if global_features is not None else None
+    glob_feat = np.array(global_features, dtype=np.float32) if global_features else None
 
     correction_map = correct_dispersion(wind_dir, wind_speed, conc_map, build_map, glob_feat)
-    
+
     return {"status_code": "success", "predictions": correction_map.tolist()}
 
 """

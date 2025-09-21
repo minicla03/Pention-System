@@ -10,4 +10,4 @@ COPY . .
 
 EXPOSE 8004
 
-CMD ["python", "-m", "streamlit", "run", "application.py", "--server.port=8004", "--server.address=0.0.0.0"]
+CMD ["python", "-m", "streamlit", "run", "ui.py", "--server.port=8004", "--server.address=0.0.0.0"]

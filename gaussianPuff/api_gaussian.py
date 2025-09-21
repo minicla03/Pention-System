@@ -9,6 +9,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from gaussianPuff.gaussianModel import run_dispersion_model
 from gaussianPuff.config import ModelConfig, WindType, StabilityType, PasquillGiffordStability, NPS, OutputType
+from gaussianPuff.plot_utils import plot_plan_view
 import uvicorn
 
 # Configurazione logger
@@ -92,7 +93,7 @@ def start_simulation(payload: dict):
                 "z": z.tolist() if isinstance(z, np.ndarray) else z,
                 "times": times.tolist() if isinstance(times, np.ndarray) else times,
                 "stability": stability.tolist() if isinstance(stability, np.ndarray) else str(stability),
-                "wind_dir": str(wind_dir),
+                "wind_dir": wind_dir.tolist() if isinstance(wind_dir, np.ndarray) else wind_dir,
                 "stab_label": str(stab_label),
                 "wind_label": str(wind_label),
                 "puff": puff.tolist() if isinstance(puff, np.ndarray) else (str(puff) if puff is not None else None)

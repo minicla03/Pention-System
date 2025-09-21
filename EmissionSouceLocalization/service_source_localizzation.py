@@ -3,34 +3,27 @@ import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
 import joblib
-from typing import List
+import logging
 import os
 
-class SensorTimeSeries:
-    def __init__(self, time, conc, simulation_id, wind_dir_x, wind_dir_y, wind_speed, wind_type):
-        self.time = time
-        self.conc = conc
-        self.simulation_id = simulation_id
-        self.wind_dir_x = wind_dir_x
-        self.wind_dir_y = wind_dir_y
-        self.wind_speed = wind_speed
-        self.wind_type = wind_type
-
-    def dict(self):
-        return {
-            "time": self.time,
-            "conc": self.conc,
-            "simulation_id": self.simulation_id,
-            "wind_dir_x": self.wind_dir_x,
-            "wind_dir_y": self.wind_dir_y,
-            "wind_speed": self.wind_speed,
-            "wind_type": self.wind_type
-        }
+# --- Logging setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(__file__)
-MODEL_PATH = os.path.join(BASE_DIR, "emission_source_model.pkl")
+MODEL_PATH = os.path.join(BASE_DIR, "models/")
 
-model = joblib.load(MODEL_PATH)
+# Caricamento modello e scaler
+logger.info(f"Loading model from {MODEL_PATH}")
+model = joblib.load(os.path.join(MODEL_PATH, "emission_source_model.pkl"))
+logger.info("Model loaded successfully.")
+
+logger.info(f"Loading scaler from {MODEL_PATH}")
+scaler = joblib.load(os.path.join(MODEL_PATH, "scaler.pkl"))
+logger.info("Scaler loaded successfully.")
 
 def estrai_feature(time, conc, window=None, spike_height=None):
    
@@ -92,42 +85,51 @@ def estrai_feature(time, conc, window=None, spike_height=None):
         "spike_frequency": spike_freq
     }
 
-def predict_source(sensors):
-    
+def predict_source(sensors: list, n_sensor_operating: int):
+
+    logger.info(f"Predicting source for {len(sensors)} sensor readings")
+
     df = pd.DataFrame([s.dict() for s in sensors])
+    logger.info(df.info)
+
+    if df.empty:
+        logger.warning("Nessun dato sensori disponibile!")
+        return {"predicted_location": [(None, None)]}
+
     agg_features_list = []
+    for sensor_id, group in df.groupby("sensor_id"):
+        times = group["time"].to_list()
+        concs = group["conc"].to_list()
 
-    for sim_id, group in df.groupby("simulation_id"):
-        valid_sensors = group[group["conc"].apply(lambda x: len(x) > 0)]
-        sensori_features = []
-
-        for _, row in valid_sensors.iterrows():
-            feat = estrai_feature(row["time"], row["conc"])
-            sensori_features.append(feat)
-
-        if sensori_features:
-            df_features = pd.DataFrame(sensori_features)
-            agg_features = df_features.mean().add_suffix("_mean").to_dict()
-            agg_features.update(df_features.std().add_suffix("_std").to_dict())
-        else:
-            # Nessun sensore valido → NaN
-            agg_features = {col: np.nan for col in [
-                "C_max_mean","t_peak_mean","t_first_peak_mean","mean_mean","std_mean",
-                "AUC_mean","rise_rate_mean","fall_rate_mean","plume_duration_mean",
-                "spike_count_mean","spike_frequency_mean"]}
-        
+        feat = estrai_feature(times, concs)
         first_row = group.iloc[0]
-        agg_features.update({
+        feat.update({
             "wind_dir_x": first_row["wind_dir_x"],
             "wind_dir_y": first_row["wind_dir_y"],
             "wind_speed": first_row["wind_speed"],
-            "wind_type": first_row["wind_type"]
+            "wind_type": first_row["wind_type"],
+            "n_sens_valid": n_sensor_operating,
         })
-        agg_features_list.append(agg_features)
+        agg_features_list.append(feat)
 
     X_input = pd.DataFrame(agg_features_list)
 
-    y_pred = model.predict(X_input)
+    X_input = X_input.fillna(0)
+
+    for col in ["simulation_id", "source_x", "source_y"]:
+        if col not in X_input.columns:
+            X_input[col] = 0
+
+    cols_scaler = scaler.feature_names_in_ if hasattr(scaler, "feature_names_in_") else X_input.columns
+    X_input = X_input.reindex(columns=cols_scaler, fill_value=0)
+
+    X_scaled = scaler.transform(X_input)
+    X_scaled_df = pd.DataFrame(X_scaled, columns=cols_scaler)
+
+    logger.info(f"Input features shape after scaling: {X_scaled_df.shape}")
+
+    y_pred = model.predict(X_scaled_df)
     result = [{"source_x": float(x), "source_y": float(y)} for x, y in y_pred]
 
+    logger.info(f"Prediction completed: {result}")
     return {"predicted_location": result}
