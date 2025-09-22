@@ -319,15 +319,19 @@ def run_application(payload):
         return sensors_substance, substance_nps, x, y, C1, metadata
     
     real_dispersion_map = response_mcxm.json().get("predictions", [])
-    
-    progress += 20
-    progress_bar.progress(progress)
+
+    print(f"mapp finale {type(real_dispersion_map)}")
+    #progress += 20
+    #progress_bar.progress(progress)
+
+    from streamlit_folium import st_folium
 
     if map_section is not None:
-        plot_dispersion_on_map(payload["min_lat"], payload["min_lon"], 
+        m=plot_dispersion_on_map(payload["min_lat"], payload["min_lon"],
                                        payload["max_lat"], payload["max_lon"], 
-                                       sensors_substance, C1, origin_lat, origin_lon)
+                                       sensors_substance, real_dispersion_map, x, y)
         map_section.subheader("🗺️ Dispersion map")
+        st_folium(m, width=700, height=500)
 
     progress = 100
     progress_bar.progress(progress)
@@ -337,7 +341,7 @@ def run_application(payload):
         "weather": {"wind_speed": wind_speed, "wind_type": wind_type, "stability": stability_type, "RH": RH},
         "sensors": sensors_substance,
         "nps": substance_nps,
-        "source": (origin_lat, origin_lon),
+        "source": (x, y),
         "dispersion_map": real_dispersion_map,
         "metadata": metadata
     }

@@ -121,8 +121,7 @@ def gaussian_simulation(payload, free_cells, wind_speed, stability_type, RH,
     print(response_gauss)
 
     if response_gauss.status_code != 200:
-        st.error("Error in Gaussian puff simulation 01.")
-        return sensors_substance, substance_nps, None, None, None, metadata
+        return None
 
     gauss_data = response_gauss.json()
     x_raw = gauss_data.get("x", [])
@@ -142,42 +141,44 @@ def gaussian_simulation(payload, free_cells, wind_speed, stability_type, RH,
 def emission_source(sensors_substance, C1, x, y, times, wind_type, wind_dir, wind_speed):
 
     payload_sensors = []
-
     for s in sensors_substance:
+
         if not s.is_fault:
+
             s.sample_substance(C1, x, y, times)
             # s.sample_substance_synthetic()
-
-            sensor_data = {
-                "sensor_id": s.id,
-                "time": [],
-                "conc": [],
-                "wind_dir_x": [],
-                "wind_dir_y": [],
-                "wind_speed": [],
-                "wind_type": wind_type.value
-            }
 
             for idx, (t_idx, conc) in enumerate(zip(s.times, s.noisy_concentrations)):
                 if idx >= len(wind_dir):
                     break
                 wd = wind_dir[idx]
 
-                sensor_data["time"].append(t_idx)
-                sensor_data["conc"].append(float(conc) if not s.is_fault else float("nan"))
-                sensor_data["wind_dir_x"].append(float(np.cos(np.deg2rad(wd))) if not s.is_fault else float("nan"))
-                sensor_data["wind_dir_y"].append(float(np.sin(np.deg2rad(wd))) if not s.is_fault else float("nan"))
-                sensor_data["wind_speed"].append(float(wind_speed) if not s.is_fault else float("nan"))
+                payload_sensors.append({
+                    "sensor_id": s.id,
+                    "sensor_is_fault": s.is_fault,
+                    "time": t_idx,
+                    "conc": conc if not s.is_fault else None,
+                    "wind_dir_x": np.cos(np.deg2rad(wd)) if not s.is_fault else None,
+                    "wind_dir_y": np.sin(np.deg2rad(wd)) if not s.is_fault else None,
+                    "wind_speed": wind_speed if not s.is_fault else None,
+                    "wind_type": wind_type.value if not s.is_fault else None,
+                })
 
-            payload_sensors.append(sensor_data)
+    n_sensor_operating = ([s for s in sensors_substance if not s.is_fault]).__len__()
 
-    print(payload_sensors)
+    response_loc = requests.post(f"{API_URL}8003/predict_source_raw", json={
+        "payload_sensors": payload_sensors,
+        "n_sensor_operating": n_sensor_operating
+    })
 
-    response = requests.post(f"{API_URL}8003/predict_source_raw", json=payload_sensors)
-    origin_lat = response.json().get("source_x", None)
-    origin_lon = response.json().get("source_y", None)
+    if response_loc.status_code != 200:
+        st.error("Error in prediction of source.")
 
-    return  origin_lat, origin_lon
+    data = response_loc.json()
+    x = data["x"]
+    y = data["y"]
+
+    return  x, y
 
 def correction_dispersion(payload):
 

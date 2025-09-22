@@ -216,7 +216,7 @@ if start:
 
     # --- Localizzazione sorgente
     status_text.text("Source estimation...")
-    origin_lat, origin_lon = estimate_location(sensors_substance)
+    origin_lat, origin_lon = estimate_location(sensors_substance, C1, )
 
     if source_section is not None:
         if origin_lat is not None and origin_lon is not None:

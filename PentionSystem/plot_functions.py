@@ -5,7 +5,7 @@ from windrose import WindroseAxes
 import folium
 from folium.plugins import HeatMap
 
-def plot_plan_view(C1, x, y,dispersion_placeholder, stability_class=1):
+def plot_plan_view(C1, x, y, dispersion_placeholder, stability_class=1):
     with dispersion_placeholder:
         fig, ax_main = plt.subplots(figsize=(8, 6))
 
@@ -21,7 +21,7 @@ def plot_plan_view(C1, x, y,dispersion_placeholder, stability_class=1):
         ax_main.set_ylabel('y (m)')
         ax_main.axis('equal')
 
-        st.pyplot(fig, clear_figure=True)
+        st.pyplot(fig, clear_figure=False)
 
 def plot_wind_rose(wind_dir, wind_speed, wind_rose_placeholder):
     with wind_rose_placeholder:
@@ -108,15 +108,13 @@ def plot_dispersion_on_map(min_lat, min_lon, max_lat, max_lon, sensors, dispersi
             lat = min_lat + (max_lat - min_lat) * (i / max(rows-1, 1))
             lon = min_lon + (max_lon - min_lon) * (j / max(cols-1, 1))
             conc = dispersion_map[i][j]
-            if conc > 0:  # evita punti nulli
-                heat_data.append([lat, lon, conc])
+            heat_data.append([lat, lon, conc])
 
     if heat_data:
         HeatMap(
             heat_data,
             radius=25,
             blur=15,
-            max_val=max([c[2] for c in heat_data]),
             min_opacity=0.2
         ).add_to(m)
 

@@ -98,29 +98,41 @@ class MCxM_CNN(torch.nn.Module):
         B = gauss_disp.size(0) #batch size
         u = gauss_disp
 
-        for _ in range(self.n_mask_correction):
+        print(f"[Forward] Input gauss_disp shape: {gauss_disp.shape}")
+        print(f"[Forward] Wind features shape: {wind_features.shape if wind_features is not None else None}")
+        print(f"[Forward] Global features shape: {global_features.shape if global_features is not None else None}")
+
+        for i in range(self.n_mask_correction):
             
             # --- MASKING LAYER
             # 1. Masking 
             u = self.mask_layer(u)  # shape: (B, m, m)
-            
+            print(f"[Forward][Step {i}] After mask_layer, u shape: {u.shape}")
+
             # 0. Concatenazione gauss_disp con variabili meteorogiche e globali
             x_flat = u.view(B, -1)  # (B, n_channel * m * m)
+            print(f"[Forward][Step {i}] x_flat shape: {x_flat.shape}")
 
             um = torch.cat([x_flat, wind_features], dim=1)  # (B, n_channel*m*m + wind_dim)
-    
+            print(f"[Forward][Step {i}] After concatenating wind_features, um shape: {um.shape}")
+
             if global_features is not None:
                 um = torch.cat([um,global_features], dim=1)  # shape: (B, m*m+2+n_global)
-            
+                print(f"[Forward][Step {i}] After concatenating global_features, um shape: {um.shape}")
+
             # --- CORRECTION NETWORK
             # 2. Flatten la mappa
             x = um.view(B, -1)  # shape: (B, m*m) -> (b, m^2)
+            print(f"[Forward][Step {i}] Flattened for encoder, x shape: {x.shape}")
 
             # 3. Correzione tramite encoder-decoder
             x = self.encoder(x)
+            print(f"[Forward][Step {i}] After encoder, x shape: {x.shape}")
             x = self.decoder(x) # shape: (B, m*m)
+            print(f"[Forward][Step {i}] After decoder, x shape: {x.shape}")
 
             # 4. ricostruzione della mappa corretta
             u = x.view(B, self.m, self.m) # shape: (B, m, m)
+            print(f"[Forward][Step {i}] Reconstructed map u shape: {u.shape}")
 
         return u

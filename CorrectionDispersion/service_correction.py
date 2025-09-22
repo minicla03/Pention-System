@@ -14,6 +14,19 @@ logger.addHandler(ch)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def calculate_mean_direction(wind_dir_array):
+    # Convert to radians
+    wind_dir_rad = np.radians(wind_dir_array)
+
+    # Calculate directional vectors
+    cos_vals = np.cos(wind_dir_rad)
+    sin_vals = np.sin(wind_dir_rad)
+
+    # Calculate mean
+    mean_cos = np.mean(cos_vals)
+    mean_sin = np.mean(sin_vals)
+
+    return mean_cos, mean_sin
 
 def load_model(binary_map, m=500, device=None, pretrained_path=None):
     model_path = os.path.join(SCRIPT_DIR, "models", "mcxm_cnn_model.pth")
@@ -37,19 +50,23 @@ def correct_dispersion(wind_dir, wind_speed, concentration_map, building_map, gl
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.debug(f"Using device: {device}")
 
+    logger.info(f"building map: {building_map.shape}")
+
     model = load_model(building_map, m=m, device=device, pretrained_path=pretrained_path)
 
-    mc = torch.tensor(concentration_map, dtype=torch.float32, device=device).unsqueeze(0)  # (1, m, m)
+    cm_agg=np.mean(concentration_map, axis=2) #shape: (500,500
+    mc = torch.tensor(cm_agg, dtype=torch.float32, device=device).unsqueeze(0)  # (1, m, m)
     logger.debug(f"Concentration map tensor shape: {mc.shape}")
 
-    wind_dir_cos = np.cos(np.radians(wind_dir))
-    wind_dir_sin = np.sin(np.radians(wind_dir))
+    #local_maps = building_map.unsqueeze(0)  # [1, 1, m, m]
+
+    wind_dir_cos , wind_dir_sin = calculate_mean_direction(wind_dir)
     wind_dir_angle = np.arctan2(wind_dir_sin, wind_dir_cos)
     degree_angle = np.degrees(wind_dir_angle)
 
-    logger.debug(f"Wind direction: {wind_dir}°, cosine={wind_dir_cos}, sine={wind_dir_sin}, angle={wind_dir_angle}")
+    logger.debug(f"Wind direction: {degree_angle}°, ")
 
-    wind_features = torch.tensor([[degree_angle, wind_speed]], dtype=torch.float32, device=device)
+    wind_features = torch.tensor([[wind_speed, degree_angle]], dtype=torch.float32, device=device)
     logger.debug(f"Wind features tensor: {wind_features}")
 
     if global_feature is not None:
@@ -62,7 +79,7 @@ def correct_dispersion(wind_dir, wind_speed, concentration_map, building_map, gl
     with torch.no_grad():
         try:
             output = model(mc, wind_features, global_features)
-            output = output.detach().cpu().numpy()[0]
+            output = output.detach().cpu().numpy()[0] # togli batch, shape (m, m)
             logger.info(f"Inference completed. Output shape: {output.shape}")
         except Exception as e:
             logger.error(f"Error during model inference: {e}")

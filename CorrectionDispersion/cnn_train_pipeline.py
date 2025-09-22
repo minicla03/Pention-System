@@ -130,6 +130,10 @@ if __name__ == "__main__":
     csv_df = pd.read_csv(CSV_PATH)
     csv_df_reduced = csv_df.groupby('simulation_id').first().reset_index()
     csv_df_reduced = csv_df_reduced[['wind_dir_cos', 'wind_dir_sin','wind_speed']]
+
+    print(type(csv_df_reduced["wind_dir_cos"][0]))
+    print(type(csv_df_reduced["wind_dir_sin"][0]))
+    print(type(csv_df_reduced["wind_speed"][0]))
     
     m = 500
 
