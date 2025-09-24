@@ -31,7 +31,7 @@ def generate_binary_map(payload):
     free_cells = np.argwhere(binary_map == 1)
     building_cells = np.sum(binary_map == 0)
 
-    return binary_map, free_cells, building_cells
+    return binary_map, free_cells, building_cells, metadata
 
 def meteorological_condition():
 
@@ -58,7 +58,6 @@ def air_sample(n_sensors, free_cells, wind_speed, stability_type, RH, wind_type)
     return sensors_substance, mass_spectrum
 
 def nps_classificator(mass_spectrum):
-
     if mass_spectrum:
         spectra_json = [m.tolist() for m in mass_spectrum]
         print(f"spectra_json: {type(spectra_json)}")

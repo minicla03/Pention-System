@@ -319,8 +319,9 @@ def run_application(payload):
         return sensors_substance, substance_nps, x, y, C1, metadata
     
     real_dispersion_map = response_mcxm.json().get("predictions", [])
-
+    real_dispersion_map = np.array(real_dispersion_map)
     print(f"mapp finale {type(real_dispersion_map)}")
+    print(real_dispersion_map.shape)
     #progress += 20
     #progress_bar.progress(progress)
 
@@ -332,15 +333,18 @@ def run_application(payload):
                                        sensors_substance, real_dispersion_map, x, y)
         map_section.subheader("🗺️ Dispersion map")
         st_folium(m, width=700, height=500)
+        m.save("dispersion_map.html")
+
+    plot_plan_view(real_dispersion_map, x_grid, y_grid, map_section)
 
     progress = 100
     progress_bar.progress(progress)
     status_text.text("Simulation completed ✅")
-
+    print("END")
     st.session_state.simulation_results = {
         "weather": {"wind_speed": wind_speed, "wind_type": wind_type, "stability": stability_type, "RH": RH},
         "sensors": sensors_substance,
-        "nps": substance_nps,
+        "nps": most_common_substance,
         "source": (x, y),
         "dispersion_map": real_dispersion_map,
         "metadata": metadata
