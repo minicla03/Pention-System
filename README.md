@@ -51,22 +51,32 @@ Pention-System/
 
 ---
 
-## ⚡ Esempio di Utilizzo
+## 💻 Interfaccia Utente
 
-Avviare l’applicazione principale:
+### 🐳 Avvio con Docker
 
+Il progetto è containerizzato per semplificare l’esecuzione e garantire la riproducibilità.
+
+#### 1. Costruzione e avvio dei container
+Dalla root del progetto:
 ```bash
-git clone https://github.com/minicla03/Pention-System.git
-cd Pention-System/PentionSystem
-streamlit run controllers.py
+docker-compose up --build
 ```
----
 
-## 📈 Risultati Attesi
+#### 2. Streamlit
+
+Per avviare la dashboard locale:
+```bash
+streamlit run application.py
+```
+
+### 📈 Risultati Attesi
 
 - Mappe di concentrazione dinamiche e interattive
 - Predizione accurata della posizione della sorgente di emissione
-- Classificazione affidabile dei dati NPS dai sensori
+- Classificazione dei dati NPS dai sensori
+
+<img width="1920" height="1080" alt="pention_system_interfaccia" src="https://github.com/user-attachments/assets/86f1cad0-4f3b-45e7-b846-ba86c3e7ce27" />
 
 ---
 
