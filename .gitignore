@@ -207,4 +207,4 @@ marimo/_lsp/
 __marimo__/
 
 CorrectionDispersion/dataset/real_dispersion
-CorrectionDispersion/models
+#CorrectionDispersion/models
