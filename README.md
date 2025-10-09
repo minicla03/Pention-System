@@ -1,7 +1,7 @@
 # Pention-System 
 
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.11+-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10+-brightgreen)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.25-orange)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-blueviolet)
 
