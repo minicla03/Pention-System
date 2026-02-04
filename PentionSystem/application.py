@@ -1,7 +1,10 @@
+import gc
 import os
 import sys
 from collections import Counter
 import requests
+from streamlit_folium import st_folium
+
 from plot_functions import *
 from utils import *
 
@@ -12,7 +15,7 @@ if project_root not in sys.path:
 from gaussianPuff.Sensor import SensorSubstance, SensorAir
 from gaussianPuff.config import NPS, OutputType, DispersionModelType, ModelConfig
 
-API_URL = "http://127.0.0.1:"
+API_URL = "http://host.docker.internal:"
 
 def run_application(payload):
     
@@ -40,6 +43,14 @@ def run_application(payload):
     free_cells = np.argwhere(binary_map == 1)
     building_cells = np.sum(binary_map == 0)
 
+    mean_height = metadata.get("mean_height")
+
+    mean_height_str = (
+        f"{float(mean_height):.1f} m"
+        if mean_height is not None and not np.isnan(mean_height)
+        else "N/A"
+    )
+
     with metadata_section:
         metadata_placeholder.markdown(
             f"**Griglia**: {metadata.get('grid_size', 'N/A')}×{metadata.get('grid_size', 'N/A')}\n"
@@ -49,7 +60,7 @@ def run_application(payload):
             f"**CRS**: {metadata.get('crs', 'N/A')}\n"
             f"**Risoluzione**: {metadata.get('resolution (m)', 'N/A')} m\n"
             f"**Densità edifici**: {float(metadata.get('building_density', np.nan)):.1f}%\n"
-            f"**Altezza media edifici**: {float(metadata.get('mean_height', np.nan))} m\n"
+            f"**Altezza media edifici**: {mean_height_str}\n"
             f"**Città**: {metadata.get('city', 'N/A')}"
         )
 
@@ -253,7 +264,7 @@ def run_application(payload):
     progress += 20
     progress_bar.progress(progress)
 
-    # --- gaussian plume dispersion (raw simulation) 
+    # --- gaussian plume dispersion (raw simulation)
     status_text.text("Raw dispersion simulation...")
 
     stacks = [(x, y, Q, h_src)]
@@ -305,12 +316,16 @@ def run_application(payload):
 
     # --- Dispersion simulation + correction
     status_text.text("Dispersion simulation...")
+
+    np.save("/tmp/C1.npy", C1)
+    np.save("/tmp/binary_map.npy", binary_map)
+
     response_mcxm = requests.post(f"{API_URL}8001/correct_dispersion",
                                   json={
                                       "wind_speed": wind_speed,
                                       "wind_dir": wind_dir.tolist(),
-                                      "concentration_map": C1.tolist(),
-                                      "building_map": binary_map.tolist(),
+                                      "concentration_map": "/tmp/C1.npy",
+                                      "building_map": "/tmp/binary_map.npy",
                                       "global_features": None
                                   })
 
@@ -320,10 +335,20 @@ def run_application(payload):
     
     real_dispersion_map = response_mcxm.json().get("predictions", [])
     real_dispersion_map = np.array(real_dispersion_map)
+    del response_mcxm
+    gc.collect()
     print(f"mapp finale {type(real_dispersion_map)}")
     print(real_dispersion_map.shape)
     #progress += 20
     #progress_bar.progress(progress)
+
+    if real_dispersion_map.ndim == 3:
+        # integrazione temporale (coerente con plot_plan_view)
+        tmp=real_dispersion_map
+        real_dispersion_map = np.trapezoid(tmp, axis=2)
+        del tmp
+        gc.collect()
+   # assert real_dispersion_map.ndim == 2
 
     from streamlit_folium import st_folium
 
@@ -335,27 +360,57 @@ def run_application(payload):
         st_folium(m, width=700, height=500)
         m.save("dispersion_map.html")
 
-    plot_plan_view(real_dispersion_map, x_grid, y_grid, map_section)
+        np.save("/tmp/dispersion.npy", real_dispersion_map)
+
+
+        st.session_state.simulation_results["dispersion_map"] = {
+            "min_lat": payload["min_lat"],
+            "min_lon": payload["min_lon"],
+            "max_lat": payload["max_lat"],
+            "max_lon": payload["max_lon"],
+            "sensors": [
+                {"id": s.id, "x": s.x, "y": s.y, "is_fault": s.is_fault}
+                for s in sensors_substance
+            ],
+            "dispersion": "/tmp/dispersion.npy",
+            "x_src": x,
+            "y_src": y
+        }
+
+    print("C1 shape:", C1.shape)
+    print("C1 ndim:", C1.ndim)
+
 
     progress = 100
     progress_bar.progress(progress)
     status_text.text("Simulation completed ✅")
     print("END")
-    st.session_state.simulation_results = {
-        "weather": {"wind_speed": wind_speed, "wind_type": wind_type, "stability": stability_type, "RH": RH},
-        "sensors": sensors_substance,
+
+    np.save("/tmp/dispersion.npy", real_dispersion_map)
+
+    st.session_state.simulation_results.update({
+        "weather": {
+            "wind_speed": wind_speed,
+            "wind_type": wind_type,
+            "stability": stability_type,
+            "RH": RH
+        },
+        "sensors": [
+                 {"id": s.id, "x": s.x, "y": s.y, "is_fault": s.is_fault}
+                for s in sensors_substance
+        ],
         "nps": most_common_substance,
         "source": (x, y),
-        "dispersion_map": real_dispersion_map,
         "metadata": metadata
-    }
+    })
+
 
 # ---------------- INTERFACCIA STREAMLIT ---------------- #
 st.set_page_config(page_title="PentionSystem", layout="wide")
 if "simulation_results" not in st.session_state:
     st.session_state.simulation_results = {
         "weather": None,
-        "sensors": None,
+        "sensors": [],
         "nps": None,
         "source": None,
         "dispersion_map": None,
@@ -498,6 +553,7 @@ if start:
         "Number of sensors": n_sensors
     }
 
+    gc.collect()
     run_application(payload)
 
 elif stop:
@@ -507,7 +563,7 @@ elif stop:
         "sensors": None,
         "nps": None,
         "source": None,
-        "dispersion_map": None,
+        "dispersion_map_path": None,
         "metadata": None
     }
     progress_bar.progress(0)
@@ -537,7 +593,7 @@ else:
         )
 
     if results["sensors"] is not None:
-        sensor_info = [{"ID": s.id, "x": s.x, "y": s.y, "Status": "Operating" if not s.is_fault else "Faulty"}
+        sensor_info = [{"ID": s["id"], "x": s["x"], "y": s["y"], "Status": "Operating" if not s["is_fault"] else "Faulty"}
                        for s in results["sensors"]]
         sensors_placeholder.table(sensor_info)
 
@@ -553,3 +609,37 @@ else:
             source_placeholder.write(f"Lat: {origin_lat}, Long: {origin_lon}")
         else:
             source_placeholder.warning("Source not estimated.")
+
+    dm = results.get("dispersion_map")
+
+    if isinstance(dm, dict):
+        map_section.subheader("🗺️ Dispersion map")
+
+        # Carica l'array dal file
+        dispersion_data = np.load(dm["dispersion"])
+
+        m = plot_dispersion_on_map(
+            dm["min_lat"], dm["min_lon"],
+            dm["max_lat"], dm["max_lon"],
+            dm["sensors"],
+            dispersion_data,
+            dm["x_src"],
+            dm["y_src"]
+        )
+
+        st_folium(m, width=700, height=500)
+
+#   if results["dispersion_map_path"] is not None:
+  #      real_dispersion_map = np.load(results["dispersion_map_path"])
+
+   #     m = plot_dispersion_on_map(
+    #        min_lat, min_lon,
+     #       max_lat, max_lon,
+      #      results["sensors"],
+      #      real_dispersion_map,
+       #     results["source"][0],
+        #    results["source"][1]
+        #)
+
+       # map_section.subheader("🗺️ Dispersion map")
+        #st_folium(m, width=700, height=500)

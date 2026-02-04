@@ -24,8 +24,8 @@ class BBox(BaseModel):
 class DispersionInput(BaseModel):
     wind_speed: float
     wind_dir: list
-    concentration_map: list
-    building_map: list
+    concentration_map: str
+    building_map: str
     global_features: list | None = None
 
 @app.post("/generate_binary_map")
@@ -58,14 +58,18 @@ def generate_map(bbox: BBox):
 @app.post("/correct_dispersion")
 def predict_endpoint(payload: DispersionInput):
 
-    conc_map = np.array(payload.concentration_map, dtype=np.float32)
-    build_map = np.array(payload.building_map, dtype=np.float32)
+    conc_map = np.load(payload.concentration_map)
+    build_map = np.load(payload.building_map)
     glob_feat = np.array(payload.global_features, dtype=np.float32) if payload.global_features else None
 
-    correction_map = correct_dispersion(payload.wind_dir, payload.wind_speed, conc_map, build_map, glob_feat)
 
-    return {"status_code": "success",
-            "predictions": correction_map.tolist()}
+    correction_map = correct_dispersion(payload.wind_dir, payload.wind_speed, conc_map, build_map, glob_feat)
+    # esempio, garantisco array regolare
+   # max_len = max(len(row) for row in correction_map)
+   # regular_map = [row + [0] * (max_len - len(row)) if len(row) < max_len else row for row in correction_map]
+    #correction_map = np.array(regular_map, dtype=np.float32)
+
+    return {"status_code": "success", "predictions": correction_map.tolist()}
 
 """
 if __name__ == "__main__":

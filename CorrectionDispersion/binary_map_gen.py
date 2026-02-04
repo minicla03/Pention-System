@@ -64,7 +64,8 @@ def generate_binary_map(
         # Scarica edifici da OSM
         tags = {"building": True, "height": True}
         buildings = ox.features_from_place(place, tags=tags) if not bbox else ox.features_from_bbox(bbox, tags=tags) #type: ignore
-        
+
+
         if buildings.empty:
             logging.warning(f"No building data found for {place}. Returning an empty map.")
             return np.zeros((grid_size, grid_size), dtype=np.uint8), {}
@@ -119,6 +120,13 @@ def generate_binary_map(
 
     building_density_percent = ( building_cells / total_cells) * 100
 
+    if 'height' in buildings_proj.columns:
+        heights = pd.to_numeric(buildings_proj['height'], errors='coerce')
+        heights = heights.dropna()
+        mean_height = heights.mean() if not heights.empty else None
+    else:
+        mean_height = None
+
     # Metadata
     metadata = {
         'city': place,
@@ -132,7 +140,7 @@ def generate_binary_map(
         'total_cells': total_cells,
         'resolution (m)': cell_width,
         'building_density': building_density_percent,
-        'mean_height': pd.to_numeric(buildings_proj['height'], errors='coerce').mean() if 'height' in buildings_proj.columns else None
+        'mean_height': mean_height
     }
 
     logging.info("Binary map generation complete.")

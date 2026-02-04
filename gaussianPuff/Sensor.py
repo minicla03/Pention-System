@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import random
 from scipy.interpolate import RegularGridInterpolator
@@ -119,7 +118,7 @@ class SensorSubstance:
             "source_intensity": src_intensity
         }
 
-    def _generate_mass_spectra(self, df=pd.read_csv(r"C:/Users/claud/Desktop/PENTION/ClassificatoreNPS/datasetNPS/1-s2.0-S2468170923000358-mmc1.csv", sep=',', header=0), n_generic=9, noise_level=0.01):
+    def _generate_mass_spectra(self, df=pd.read_csv(r"1-s2.0-S2468170923000358-mmc1.csv", sep=',', header=0), n_generic=9, noise_level=0.01):
         """
         Genera spettri di massa per un sensore basandosi su un dataset reale.
 
