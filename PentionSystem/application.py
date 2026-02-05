@@ -5,6 +5,7 @@ from collections import Counter
 import requests
 from streamlit_folium import st_folium
 
+
 from plot_functions import *
 from utils import *
 
@@ -553,6 +554,7 @@ if start:
         "Number of sensors": n_sensors
     }
 
+    clean_tmp_files()
     gc.collect()
     run_application(payload)
 
@@ -629,6 +631,8 @@ else:
 
         st_folium(m, width=700, height=500)
 
+
+
 #   if results["dispersion_map_path"] is not None:
   #      real_dispersion_map = np.load(results["dispersion_map_path"])
 
@@ -643,3 +647,5 @@ else:
 
        # map_section.subheader("🗺️ Dispersion map")
         #st_folium(m, width=700, height=500)
+    #
+    #

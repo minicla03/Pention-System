@@ -6,14 +6,15 @@ WORKDIR /PentionSystem
 # Installare dipendenze di sistema minime
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     git \
-    build-essential \
+   build-essential \
  && rm -rf /var/lib/apt/lists/*
 
 # Aggiorna pip
 RUN pip install --no-cache-dir --upgrade pip
 
 # Installa Poetry usando lo script ufficiale
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN pip install --no-cache-dir poetry
+
 
 # Aggiungi Poetry al PATH
 ENV PATH="/root/.local/bin:$PATH"
