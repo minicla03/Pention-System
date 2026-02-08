@@ -2,10 +2,13 @@ import matplotlib.pyplot as plt
 import random
 from scipy.interpolate import RegularGridInterpolator
 import os
-import sys 
+import sys
+
+from CorrectionDispersion.simulation_gen import wind_type
 from gaussianPuff.config import WindType, StabilityType, PasquillGiffordStability
 import numpy as np
 import pandas as pd
+from meteo import get_meteo,infer_wind_type_from_openmeteo
 
 """sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ClassificatoreNPS import service_clf_nps"""
@@ -248,7 +251,10 @@ class SensorAir:
         self.z = z
 
     def sample_meteorology(self):
-        wind_type = random.choice([WindType.CONSTANT ,WindType.PREVAILING, WindType.FLUCTUATING])
+
+        meteo=get_meteo(self.x, self.y)
+        wind_type=infer_wind_type_from_openmeteo(meteo["wind_dir"])
+     #   wind_type = random.choice([WindType.CONSTANT ,WindType.PREVAILING, WindType.FLUCTUATING])
         stability_type = StabilityType.CONSTANT
         if stability_type == StabilityType.CONSTANT:
             stability_value = random.choice([

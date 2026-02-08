@@ -70,8 +70,19 @@ def run_application(payload):
 
     # --- Meteo condition
     status_text.text("Sample meteo condition...")
-    sensor_air = SensorAir(sensor_id=00, x=0.0, y=0.0, z=2.0)
+
+    lat_center = (payload["min_lat"] + payload["max_lat"]) / 2
+    lon_center = (payload["min_lon"] + payload["max_lon"]) / 2
+
+    meteo = get_meteo(lat_center, lon_center)
+
+    sensor_air = SensorAir(sensor_id=00, x=lon_center, y=lat_center, z=2.0)
+
+    #sensor_air = SensorAir(sensor_id=00, x=0.0, y=0.0, z=2.0)
     wind_speed, wind_type, stability_type, stability_value, humidify, dry_size, RH = sensor_air.sample_meteorology()
+
+    wind_speed = meteo["wind_speed"]
+    RH = meteo["RH"]
 
     if weather_section is not None:
         weather_placeholder.markdown(

@@ -1,38 +1,7 @@
-import numpy as np
-import os
-import gc
-
-nps_classes = [
-    'Cathinone analogues',
-    'Cannabinoid analogues',
-    'Phenethylamine analogues',
-    'Piperazine analogues',
-    'Tryptamine analogues',
-    'Fentanyl analogues'
-]
-
-def random_position(free_cells):
-    idx = np.random.choice(len(free_cells))
-    y, x = free_cells[idx]
-    return float(y), float(x)
-
-def clean_tmp_files():
-    tmp_files = [
-        "/tmp/C1.npy",
-        "/tmp/binary_map.npy"
-    ]
-
-    for f in tmp_files:
-        try:
-            if os.path.exists(f):
-                os.remove(f)
-        except Exception as e:
-            print(f"[cleanup] Cannot remove {f}: {e}")
-
-    gc.collect()
-
 import requests
 from datetime import datetime
+from gaussianPuff.config import WindType
+import numpy as np
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -42,9 +11,7 @@ def get_meteo(lat, lon):
         "latitude": lat,
         "longitude": lon,
         "hourly": [
-            "windspeed_10m",
             "winddirection_10m",
-            "relativehumidity_2m"
         ],
         "timezone": "UTC"
     }
@@ -71,7 +38,27 @@ def get_meteo(lat, lon):
     )
 
     return {
-        "wind_speed": hourly["windspeed_10m"][time_index],
         "wind_dir": hourly["winddirection_10m"][time_index],
-        "RH": hourly["relativehumidity_2m"][time_index],
     }
+
+
+def infer_wind_type_from_openmeteo(wind_dir: np.ndarray) -> WindType:
+    """
+    Deduce WindType from a time series of wind directions (degrees).
+    """
+    wind_dir = np.asarray(wind_dir)
+
+    # Convert degrees → radians
+    theta = np.radians(wind_dir)
+
+    mean_cos = np.mean(np.cos(theta))
+    mean_sin = np.mean(np.sin(theta))
+
+    R = np.sqrt(mean_cos**2 + mean_sin**2)
+
+    if R > 0.9:
+        return WindType.CONSTANT
+    elif R > 0.6:
+        return WindType.PREVAILING
+    else:
+        return WindType.FLUCTUATING
