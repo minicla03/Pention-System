@@ -82,13 +82,26 @@ def plot_dispersion_on_map(min_lat, min_lon, max_lat, max_lon, sensors, dispersi
 
     m = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="cartodbpositron")
 
-
+    '''
     # Sensori
     for s in sensors:
         x,y=sensor_xy(s)
         sid=sensor_get(s,"id")
         folium.Marker(
             [x,y],
+            popup=f"Sensor {sid}",
+            icon=folium.Icon(color="blue", icon="info-sign")
+        ).add_to(m)
+    '''
+    for s in sensors:
+        row, col = sensor_xy(s)  # row, col (non x,y!)
+        sid = sensor_get(s, "id")
+
+        lat = max_lat - (row / (len(dispersion_map) - 1)) * (max_lat - min_lat)
+        lon = min_lon + (col / (len(dispersion_map[0]) - 1)) * (max_lon - min_lon)
+
+        folium.Marker(
+            [lat, lon],
             popup=f"Sensor {sid}",
             icon=folium.Icon(color="blue", icon="info-sign")
         ).add_to(m)
@@ -108,7 +121,8 @@ def plot_dispersion_on_map(min_lat, min_lon, max_lat, max_lon, sensors, dispersi
 
     for i in range(rows):
         for j in range(cols):
-            lat = min_lat + (max_lat - min_lat) * (i / max(rows-1, 1))
+            #lat = min_lat + (max_lat - min_lat) * (i / max(rows-1, 1))
+            lat = max_lat - (max_lat - min_lat) * (i / max(rows - 1, 1))
             lon = min_lon + (max_lon - min_lon) * (j / max(cols-1, 1))
             conc = float(dispersion_map[i][j])
             heat_data.append([lat, lon, conc])

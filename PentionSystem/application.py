@@ -81,8 +81,7 @@ def run_application(payload):
     #sensor_air = SensorAir(sensor_id=00, x=0.0, y=0.0, z=2.0)
     wind_speed, wind_type, stability_type, stability_value, humidify, dry_size, RH = sensor_air.sample_meteorology()
 
-    wind_speed = meteo["wind_speed"]
-    RH = meteo["RH"]
+
 
     if weather_section is not None:
         weather_placeholder.markdown(

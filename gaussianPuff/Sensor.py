@@ -283,7 +283,7 @@ class SensorAir:
         humidify = random.choice([True, False])
         dry_size = infer_dry_size_from_openmeteo(wind_speed)
        # RH = round(np.random.uniform(0, 0.99), 2) if humidify else 0.0
-        RH = meteo["humidity"] if humidify else 0.0
+        RH = meteo["RH"] if humidify else 0.0
 
 
         return wind_speed, wind_type, stability_type, stability_value, humidify, dry_size, RH
