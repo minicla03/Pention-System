@@ -62,9 +62,12 @@ def generate_binary_map(
             bounds = gdf_place_proj.total_bounds
 
         # Scarica edifici da OSM
-        tags = {"building": True, "height": True}
-        buildings = ox.features_from_place(place, tags=tags) if not bbox else ox.features_from_bbox(bbox, tags=tags) #type: ignore
+        #tags = {"building": True, "height": True}
+        # buildings = ox.features_from_place(place, tags=tags) if not bbox else ox.features_from_bbox(bbox, tags=tags) #type: ignore
+        tags = {"building": True}
 
+
+        buildings = ox.features_from_bbox(bbox, tags=tags)
 
         if buildings.empty:
             logging.warning(f"No building data found for {place}. Returning an empty map.")
@@ -96,6 +99,10 @@ def generate_binary_map(
     buildings_sindex = buildings_proj.sindex
 
     # Riemipimento binary grid
+    # Riemipimento binary grid
+    match_count = 0
+    no_match_count = 0
+
     for i in tqdm(range(grid_size), desc="Processing grid"):
         for j in range(grid_size):
             cell = box(
@@ -109,9 +116,26 @@ def generate_binary_map(
             possible_matches_index = list(buildings_sindex.intersection(cell.bounds))
             possible_matches = buildings_proj.iloc[possible_matches_index]
 
-            # Controlla intersezioni 
+            # 🔍 DEBUG: conta le intersezioni
             if not possible_matches.empty and possible_matches.intersects(cell).any():
                 binary_grid[j, i] = 0
+                match_count += 1
+            else:
+                no_match_count += 1
+
+    # Dopo il ciclo
+    logging.info(f"🔍 Celle con edifici: {match_count}")
+    logging.info(f"🔍 Celle senza edifici: {no_match_count}")
+    logging.info(f"🔍 Rapporto: {match_count / (match_count + no_match_count) * 100:.1f}% edifici")
+
+    # 🚨 VERIFICA CRITICA
+    if no_match_count == 0:
+        logging.error("⚠️ PROBLEMA: TUTTE le celle sono state marcate come edifici!")
+        logging.error("Possibili cause:")
+        logging.error("  1. Spatial index restituisce tutto come match")
+        logging.error("  2. Problema con buildings_proj.intersects()")
+        logging.error("  3. Coordinate della bbox sbagliate")
+
 
     # Calcola statistiche
     total_cells = grid_size * grid_size

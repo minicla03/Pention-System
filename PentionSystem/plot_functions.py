@@ -109,7 +109,7 @@ def plot_dispersion_on_map(min_lat, min_lon, max_lat, max_lon, sensors, dispersi
     # Sorgente stimata
     if source_lat is not None and source_lon is not None:
         folium.Marker(
-            [source_lat, source_lon],
+            [source_lon, source_lat],
             popup="Sorgente Stimata",
             icon=folium.Icon(color="red", icon="fire")
         ).add_to(m)

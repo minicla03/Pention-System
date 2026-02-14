@@ -131,7 +131,7 @@ def predict_source(sensors: list, n_sensor_operating: int):
 
     y_pred = model.predict(X_scaled_df)
 
-    x, y = y_pred[0]
+    x,y = y_pred[0]
 
     logger.info(f"Prediction completed: {x},{y}")
     return x, y

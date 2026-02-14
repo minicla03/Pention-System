@@ -263,8 +263,10 @@ def run_application(payload):
         st.error("Error in prediction of source.")
 
     data = response_loc.json()
-    x = data["x"]
-    y = data["y"]
+    lon = data["x"]
+    lat = data["y"]
+
+    x,y=grid_index_to_coords(lon,lat,bounds,500)
 
     if source_section is not None:
         if x is not None and y is not None:

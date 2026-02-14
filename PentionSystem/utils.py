@@ -75,3 +75,23 @@ def get_meteo(lat, lon):
         "wind_dir": hourly["winddirection_10m"][time_index],
         "RH": hourly["relativehumidity_2m"][time_index],
     }
+
+
+def grid_index_to_coords(idx_x, idx_y, bounds, grid_size):
+    """
+    Converte indici della griglia in coordinate geografiche.
+
+    Args:
+        idx_x, idx_y: Indici nella griglia (0 a grid_size-1)
+        bounds: (min_lon, min_lat, max_lon, max_lat)
+        grid_size: Dimensione griglia (es. 500)
+
+    Returns:
+        (lon, lat): Coordinate geografiche
+    """
+    min_lon, min_lat, max_lon, max_lat = bounds
+
+    lon = min_lon + (idx_x / (grid_size - 1)) * (max_lon - min_lon)
+    lat = min_lat + (idx_y / (grid_size - 1)) * (max_lat - min_lat)
+
+    return lon, lat
