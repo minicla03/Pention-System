@@ -44,6 +44,12 @@ def run_application(payload):
     free_cells = np.argwhere(binary_map == 1)
     building_cells = np.sum(binary_map == 0)
 
+    if len(free_cells) == 0:
+        st.error("❌ Mappa binaria invalida: nessuna cella libera trovata. "
+                 "Verifica le coordinate della bounding box.")
+        return None
+
+
     mean_height = metadata.get("mean_height")
 
     mean_height_str = (
@@ -284,7 +290,7 @@ def run_application(payload):
 
     param_gaussian_model = ModelConfig(
         days=10,
-        RH=RH,
+        RH=RH,\
         aerosol_type=NPS(nps),
         humidify=humidify,
         stability_profile=stability_type,
