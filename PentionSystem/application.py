@@ -159,6 +159,11 @@ def run_application(payload):
         else:
             nps_placeholder.warning("No NPS identified.")
 
+    del mass_spectrum, spectra_json
+    if 'response_dnn' in locals():
+        del response_dnn
+    gc.collect()
+
     progress += 20
     progress_bar.progress(progress)
 
@@ -228,6 +233,7 @@ def run_application(payload):
     status_text.text("Wind rose graph generation...")
     plot_wind_rose(wind_dir, wind_speed, wind_rose_placeholder)
 
+
     #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     # --- Localizzazione sorgente
@@ -290,7 +296,7 @@ def run_application(payload):
 
     param_gaussian_model = ModelConfig(
         days=10,
-        RH=RH,\
+        RH=RH,
         aerosol_type=NPS(nps),
         humidify=humidify,
         stability_profile=stability_type,
@@ -361,6 +367,7 @@ def run_application(payload):
     #progress += 20
     #progress_bar.progress(progress)
 
+
     if real_dispersion_map.ndim == 3:
         # integrazione temporale (coerente con plot_plan_view)
         tmp=real_dispersion_map
@@ -420,7 +427,8 @@ def run_application(payload):
         ],
         "nps": most_common_substance,
         "source": (x, y),
-        "metadata": metadata
+        "metadata": metadata,
+        "wind_dir":wind_dir,
     })
 
 
@@ -649,8 +657,12 @@ else:
 
         st_folium(m, width=700, height=500)
 
-
-
+    if results.get("wind_dir") is not None and results.get("weather") is not None:
+        plot_wind_rose(
+            np.array(results["wind_dir"]),
+            results["weather"]["wind_speed"],
+            wind_rose_placeholder
+        )
 #   if results["dispersion_map_path"] is not None:
   #      real_dispersion_map = np.load(results["dispersion_map_path"])
 

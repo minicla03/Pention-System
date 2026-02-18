@@ -12,6 +12,7 @@ package-mode = false
 dependencies = [
     "numpy",
     "folium",
+    "plotly",
     "streamlit",
     "matplotlib",
     "streamlit-folium",
