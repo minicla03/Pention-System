@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Aggiungo al path la directory superiore
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from ClassificatoreNPS import service_clf_nps
+
+import service_clf_nps
 import uvicorn
 
 class Spectra(BaseModel):

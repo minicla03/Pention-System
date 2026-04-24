@@ -39,6 +39,7 @@ def predict_source_raw(request: PredictRequest):
         x, y = predict_source(request.payload_sensors, request.n_sensor_operating)
         logger.info("Predizione sorgente completata")
 
+
         return  {
                 "status": 200,
                 "x": x,

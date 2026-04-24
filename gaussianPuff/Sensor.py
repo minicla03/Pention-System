@@ -1,12 +1,14 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import random
 from scipy.interpolate import RegularGridInterpolator
 import os
-import sys 
+import sys
+
+#from CorrectionDispersion.simulation_gen import wind_type
 from gaussianPuff.config import WindType, StabilityType, PasquillGiffordStability
 import numpy as np
 import pandas as pd
+from gaussianPuff.meteo import get_meteo,infer_wind_type_from_openmeteo,infer_dry_size_from_openmeteo,infer_stability_from_openmeteo
 
 """sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ClassificatoreNPS import service_clf_nps"""
@@ -119,7 +121,7 @@ class SensorSubstance:
             "source_intensity": src_intensity
         }
 
-    def _generate_mass_spectra(self, df=pd.read_csv(r"C:/Users/claud/Desktop/PENTION/ClassificatoreNPS/datasetNPS/1-s2.0-S2468170923000358-mmc1.csv", sep=',', header=0), n_generic=9, noise_level=0.01):
+    def _generate_mass_spectra(self, df=pd.read_csv(r"1-s2.0-S2468170923000358-mmc1.csv", sep=',', header=0), n_generic=9, noise_level=0.01):
         """
         Genera spettri di massa per un sensore basandosi su un dataset reale.
 
@@ -249,25 +251,41 @@ class SensorAir:
         self.z = z
 
     def sample_meteorology(self):
-        wind_type = random.choice([WindType.CONSTANT ,WindType.PREVAILING, WindType.FLUCTUATING])
-        stability_type = StabilityType.CONSTANT
-        if stability_type == StabilityType.CONSTANT:
-            stability_value = random.choice([
-                PasquillGiffordStability.VERY_UNSTABLE,
-                PasquillGiffordStability.MODERATELY_UNSTABLE,
-                PasquillGiffordStability.SLIGHTLY_UNSTABLE,
-                PasquillGiffordStability.NEUTRAL,
-                PasquillGiffordStability.MODERATELY_STABLE,
-                PasquillGiffordStability.VERY_STABLE
-            ])
-        else:
+
+        meteo=get_meteo(self.x, self.y)
+        wind_type=infer_wind_type_from_openmeteo(meteo["wind_dir"])
+     #   wind_type = random.choice([WindType.CONSTANT ,WindType.PREVAILING, WindType.FLUCTUATING])
+       # stability_type = StabilityType.CONSTANT
+      #  if stability_type == StabilityType.CONSTANT:
+       #     stability_value = random.choice([
+       #         PasquillGiffordStability.VERY_UNSTABLE,
+      #          PasquillGiffordStability.MODERATELY_UNSTABLE,
+       #         PasquillGiffordStability.SLIGHTLY_UNSTABLE,
+       #         PasquillGiffordStability.NEUTRAL,
+       #         PasquillGiffordStability.MODERATELY_STABLE,
+       #         PasquillGiffordStability.VERY_STABLE
+        #    ])
+       # else:
             # Fallback to a neutral stability ensuring the correct enum type
-            stability_value = PasquillGiffordStability.NEUTRAL
-        
-        wind_speed = self._assign_wind_speed(stability_value)  
-        humidify = random.choice([True, False])
-        dry_size = 1.0
-        RH = round(np.random.uniform(0, 0.99), 2) if humidify else 0.0
+        #    stability_value = PasquillGiffordStability.NEUTRAL
+
+
+        wind_speed = meteo["wind_speed"]
+        stability_type = StabilityType.CONSTANT
+        stability_value = infer_stability_from_openmeteo(
+            wind_speed=wind_speed,
+            is_day=meteo["is_day"],
+            cloud_cover=meteo["cloud_cover"]
+        )
+
+        #  wind_speed = self._assign_wind_speed(stability_value)
+
+       # humidify = random.choice([True, False])
+        humidify=True
+        dry_size = infer_dry_size_from_openmeteo(wind_speed)
+       # RH = round(np.random.uniform(0, 0.99), 2) if humidify else 0.0
+        RH = meteo["RH"] if humidify else 0.0
+
 
         return wind_speed, wind_type, stability_type, stability_value, humidify, dry_size, RH
 

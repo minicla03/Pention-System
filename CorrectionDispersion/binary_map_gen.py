@@ -4,6 +4,7 @@ import numpy as np
 import logging
 from typing import Optional, Tuple
 import matplotlib.pyplot as plt
+from shapely.validation import make_valid
 from tqdm import tqdm  
 import os
 import pandas as pd
@@ -62,9 +63,13 @@ def generate_binary_map(
             bounds = gdf_place_proj.total_bounds
 
         # Scarica edifici da OSM
-        tags = {"building": True, "height": True}
-        buildings = ox.features_from_place(place, tags=tags) if not bbox else ox.features_from_bbox(bbox, tags=tags) #type: ignore
-        
+        #tags = {"building": True, "height": True}
+        # buildings = ox.features_from_place(place, tags=tags) if not bbox else ox.features_from_bbox(bbox, tags=tags) #type: ignore
+        tags = {"building": True}
+
+
+        buildings = ox.features_from_bbox(bbox, tags=tags)
+
         if buildings.empty:
             logging.warning(f"No building data found for {place}. Returning an empty map.")
             return np.zeros((grid_size, grid_size), dtype=np.uint8), {}
@@ -78,7 +83,15 @@ def generate_binary_map(
     
     buildings_proj = buildings.to_crs(epsg=32633) #Proietta i dati degli edifici in coordinate UTM (EPSG:32633)
     logging.info(f"Buildings projected to EPSG:32633 CRS.")
-    
+
+    buildings_proj["geometry"] = buildings_proj["geometry"].apply(
+        lambda geom: make_valid(geom) if geom is not None and not geom.is_valid else geom
+    )
+    buildings_proj = buildings_proj[
+        buildings_proj["geometry"].notna() &
+        ~buildings_proj["geometry"].is_empty
+        ]
+
     # Get full bounding box of all buildings
     x_min, y_min, x_max, y_max = bounds
     logging.info(f"Total bounds: xmin={x_min:.1f}, ymin={y_min:.1f}, xmax={x_max:.1f}, ymax={y_max:.1f}")
@@ -95,6 +108,10 @@ def generate_binary_map(
     buildings_sindex = buildings_proj.sindex
 
     # Riemipimento binary grid
+    # Riemipimento binary grid
+    match_count = 0
+    no_match_count = 0
+
     for i in tqdm(range(grid_size), desc="Processing grid"):
         for j in range(grid_size):
             cell = box(
@@ -105,12 +122,34 @@ def generate_binary_map(
             )
 
             # Usa spatial index per ricerca più efficiente
-            possible_matches_index = list(buildings_sindex.intersection(cell.bounds))
-            possible_matches = buildings_proj.iloc[possible_matches_index]
+            #possible_matches_index = list(buildings_sindex.intersection(cell.bounds))
+            #possible_matches = buildings_proj.iloc[possible_matches_index]
 
-            # Controlla intersezioni 
-            if not possible_matches.empty and possible_matches.intersects(cell).any():
+            possible_matches_index = buildings_sindex.query(cell, predicate="intersects")
+
+            if len(possible_matches_index) > 0:
                 binary_grid[j, i] = 0
+
+            # 🔍 DEBUG: conta le intersezioni
+          #  if not possible_matches.empty and possible_matches.intersects(cell).any():
+           #     binary_grid[j, i] = 0
+            #    match_count += 1
+            #else:
+             #   no_match_count += 1
+
+    # Dopo il ciclo
+    #logging.info(f"🔍 Celle con edifici: {match_count}")
+    #logging.info(f"🔍 Celle senza edifici: {no_match_count}")
+   # logging.info(f"🔍 Rapporto: {match_count / (match_count + no_match_count) * 100:.1f}% edifici")
+
+    # 🚨 VERIFICA CRITICA
+ #   if no_match_count == 0:
+  #      logging.error("⚠️ PROBLEMA: TUTTE le celle sono state marcate come edifici!")
+   #     logging.error("Possibili cause:")
+    #    logging.error("  1. Spatial index restituisce tutto come match")
+     #   logging.error("  2. Problema con buildings_proj.intersects()")
+      #  logging.error("  3. Coordinate della bbox sbagliate")
+
 
     # Calcola statistiche
     total_cells = grid_size * grid_size
@@ -118,6 +157,13 @@ def generate_binary_map(
     free_cells = np.sum(binary_grid == 1)
 
     building_density_percent = ( building_cells / total_cells) * 100
+
+    if 'height' in buildings_proj.columns:
+        heights = pd.to_numeric(buildings_proj['height'], errors='coerce')
+        heights = heights.dropna()
+        mean_height = heights.mean() if not heights.empty else None
+    else:
+        mean_height = None
 
     # Metadata
     metadata = {
@@ -132,7 +178,7 @@ def generate_binary_map(
         'total_cells': total_cells,
         'resolution (m)': cell_width,
         'building_density': building_density_percent,
-        'mean_height': pd.to_numeric(buildings_proj['height'], errors='coerce').mean() if 'height' in buildings_proj.columns else None
+        'mean_height': mean_height
     }
 
     logging.info("Binary map generation complete.")

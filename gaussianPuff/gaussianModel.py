@@ -3,6 +3,7 @@ import numpy as np
 from scipy.special import erfcinv
 from gaussianPuff.config import ModelConfig, StabilityType, WindType, NPS, nps_properties, OutputType, DispersionModelType
 from gaussianPuff.gaussianFunction import gauss_func_plume, gauss_func_puff
+from gaussianPuff.meteo import get_meteo
 
 class Puff:
     def __init__(self, x, y, z, q, t_release):
@@ -84,21 +85,55 @@ def run_dispersion_model(config: ModelConfig, bounds: Optional[Tuple] = None):
         C1=np.zeros((len(y),len(z),len(times))); # array to store data, initialised to be zero
         [y_grid,z_grid]=np.meshgrid(y,z); # y and z defined at all positions on the grid
         x_grid=x[config.x_slice]*np.ones(np.shape(y));    # x is defined to be x at x_slice       
-   
+
+    lat_center=bounds[1]+(bounds[3]-bounds[1]/2) #minlon=0 minlat=1 maxlon=2 max lat=3
+    lon_center=bounds[0]+(bounds[2]-bounds[0]/2)
+
+    meteo=get_meteo(lat_center,lon_center)
+
     # Wind speed and direction setup
-    wind_speed = config.wind_speed * np.ones_like(times) #m/s
-    if config.wind_type == WindType.CONSTANT: #stable directions
-        wind_dir = np.zeros_like(times)
+    # Wind speed
+    wind_speed = config.wind_speed * np.ones_like(times)
+
+    # Direzioni reali Open-Meteo
+    wind_dir_data = np.asarray(meteo["wind_dir"])
+
+    # Garantiamo un array
+    if wind_dir_data.ndim == 0:
+        wind_dir_data = np.full(len(times), wind_dir_data)
+
+    # --- WindType logic (SENZA falsificare i dati) ---
+    if config.wind_type == WindType.CONSTANT:
+        mean_dir = circular_mean(wind_dir_data)
+        wind_dir = np.full_like(times, mean_dir)
         wind_label = "Constant wind"
-    elif config.wind_type == WindType.FLUCTUATING: # variable directions
-        wind_dir = 360. * np.random.rand(len(times))
-        wind_label = "Fluctuating wind"
-    elif config.wind_type == WindType.PREVAILING: #
-        wind_dir = -np.sqrt(2.) * erfcinv(2. * np.random.rand(len(times))) * 40.
-        wind_dir = np.mod(wind_dir, 360)
+
+    elif config.wind_type == WindType.PREVAILING:
+        prev_dir = prevailing_direction(wind_dir_data)
+        wind_dir = np.full_like(times, prev_dir)
         wind_label = "Prevailing wind"
+
+    elif config.wind_type == WindType.FLUCTUATING:
+        wind_dir = wind_dir_data[:len(times)]
+        wind_label = "Fluctuating wind"
+
     else:
         raise ValueError("Unsupported wind type")
+
+    # Normalizza sempre tra 0 e 360°
+   # wind_dir = np.mod(wind_dir, 360)
+  #  if config.wind_type == WindType.CONSTANT: #stable directions
+  #      wind_dir = np.zeros_like(times)
+   #     wind_label = "Constant wind"
+  #  elif config.wind_type == WindType.FLUCTUATING: # variable directions
+  #      wind_dir = 360. * np.random.rand(len(times))
+    #    wind_label = "Fluctuating wind"
+  #  elif config.wind_type == WindType.PREVAILING: #
+  #      wind_dir = -np.sqrt(2.) * erfcinv(2. * np.random.rand(len(times))) * 40.
+  #      wind_dir = np.mod(wind_dir, 360)
+  #      wind_label = "Prevailing wind"
+    #else:
+    #    raise ValueError("Unsupported wind type")
         
     if config.dispersion_model == DispersionModelType.PLUME:
         for t in range(len(times)):
@@ -143,3 +178,12 @@ def run_dispersion_model(config: ModelConfig, bounds: Optional[Tuple] = None):
 
     return C1, (x_grid, y_grid, z_grid), times, stability, wind_dir, stability_label, wind_label, (puffs if config.dispersion_model == DispersionModelType.PUFF else None) #, (sigma_y, sigma_z if config.dispersion_model == DispersionModelType.PUFF else None) #type:ignore
 
+
+def circular_mean(deg):
+    rad = np.radians(deg)
+    return np.degrees(np.arctan2(np.mean(np.sin(rad)), np.mean(np.cos(rad)))) % 360
+
+def prevailing_direction(deg, bins=36):
+    hist, bin_edges = np.histogram(deg, bins=bins, range=(0, 360))
+    idx = np.argmax(hist)
+    return (bin_edges[idx] + bin_edges[idx + 1]) / 2

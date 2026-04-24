@@ -1,4 +1,6 @@
 import streamlit as st
+
+from PentionSystem.application import run_application
 from controllers import *
 
 # ---------------- INTERFACCIA STREAMLIT ---------------- #

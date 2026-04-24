@@ -2,16 +2,12 @@ numpy
 pandas
 matplotlib
 tqdm
-
 osmnx
 shapely
 geopandas
-
 torch
 torch-geometric
-
 windrose
-
 fastapi
 uvicorn
 python-multipart

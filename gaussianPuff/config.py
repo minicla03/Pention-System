@@ -35,6 +35,8 @@ class WindType(Enum):
         except KeyError:
             raise ValueError(f"No WindType member matches '{wind_type}'")
 
+
+
 class PasquillGiffordStability(Enum):
     VERY_UNSTABLE = 1
     MODERATELY_UNSTABLE = 2

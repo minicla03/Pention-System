@@ -1,7 +1,7 @@
-numpy
+numpy==1.26.4
 joblib
-scikit-learn
+scikit-learn==1.6.1
 tensorflow 
 fastapi
 uvicorn
-imblearn
+imbalanced-learn
